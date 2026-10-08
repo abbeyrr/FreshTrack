@@ -1,0 +1,15 @@
+.dotnet9/
+.dotnet/
+.packages/
+.templateengine/
+.vs/
+Backup/
+UpgradeLog.htm
+**/bin/
+**/obj/
+**/TestResults/
+*.user
+*.suo
+*.db
+*.db-shm
+*.db-wal
