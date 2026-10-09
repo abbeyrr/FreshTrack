@@ -1,6 +1,6 @@
 # FreshTrack — report writer handoff
 
-This handoff records the implemented project as verified through **7 October 2026**. It is source material for the group's own **1500–2000 English word PDF**, not the final report. Do not describe a planned feature as implemented.
+This handoff records the implemented project and verification available through **8 October 2026**. It is source material for the group's own **1500–2000 English word PDF**, not the final report. Do not describe a planned feature as implemented. Section 5 proposes a three-person explanation and two-writer report handoff; it does not establish historical human code authorship.
 
 ## 1. Project facts summary
 
@@ -47,6 +47,8 @@ Development sequence: specification review; solution and domain layer; WPF scree
 
 Input checks are in `InventoryService.Validate`, `ShoppingService.AddAsync`/`MarkPurchasedAsync`/`TransferToInventoryAsync`, and UI numeric/date parsing in `MainWindow.xaml.cs`. Business exceptions are caught by `RunAsync`, which writes a status message and opens a warning dialog. Food deletion has a confirmation dialog. NUnit tests in `FreshTrack.Tests/FreshTrackTests.cs` cover warning boundaries, bad inputs, inventory add/edit/delete, purchase marking without inventory transfer, transfer once only, partial waste, category report totals, SQLite persistence across contexts, consolidation of repeated food-use records, cleanup of old transferred rows while preserving pending purchases, and the 50,000-row ML.NET synthetic training/test flow. On 7 October 2026 the CLI build produced **0 warnings and 0 errors**; NUnit reported **8 passed, 0 failed**. An earlier Reports model version was clicked in a running WPF window; it displayed category rows. After the remaining-days correction, the Release build succeeded with **0 warnings and 0 errors** and all **8 NUnit tests passed**. After model-based dashboard priority and threshold calibration were added, one held-out synthetic test run selected a **59% threshold** and yielded **AUC 0.850, F1 0.762, precision 0.800, recall 0.727**. These metrics evaluate only the revised simulator. The test verified a meat item bought today and expiring tomorrow has Date status **Soon** and model priority **High risk**, plus cases where far-dated food is High risk and near-dated food is Lower risk; it also loaded the saved model and threshold to score newly added stock. The revised WPF priority dashboard, automatic model preparation, and rescoring compiled but have not been manually exercised in the GUI. Earlier GUI checks launched all four tabs on Windows. A Tomatoes purchase in the earlier one-step version was checked in the UI and directly in SQLite, then remained visible after restarting the app. Test Pears was added through the UI; an Expired-only filter displayed Spinach alone, and the report stock total updated to 12. A prior two-step Shopping List was opened in WPF. The final version removes a shopping row after transfer and omits the redundant Inventory column. An automated click on a real shopping item was rejected by approval review because it would change the existing database; the complete two-step GUI sequence remains unverified. On 6 October, Visual Studio 2022 17.14.41 loaded all three projects, built them successfully (3 succeeded, 0 failed), and launched FreshTrack.App with Ctrl+F5. The final ZIP still needs testing on the assigned lab computer.
 
+On **8 October 2026**, after the source and documents were uploaded to `abbeyrr/FreshTrack`, the checked-out GitHub `main` version was built again in Release with **0 warnings and 0 errors** and its NUnit suite passed **8/8 tests**. The repository contains the 25 tracked solution/source/document files; the local SQLite database, SDK/package caches, build output, and assignment specification PDF were not uploaded. This verification does not replace the remaining manual GUI and laboratory checks listed above.
+
 ## 4. Flowchart
 
 ```mermaid
@@ -79,18 +81,34 @@ flowchart TD
 
 For the final PDF, redraw or export this flowchart legibly. `MainWindow.RefreshAllAsync` reads food rows from the inventory repository, classifies their factual date status with `FoodExtensions`, and binds the results to the dashboard. The ML service prepares or loads a model, scores current stock, and supplies the calibrated threshold used for the dashboard's nonexpired attention priority. Every inventory mutation refreshes the views and model scores. Synthetic CSV/model/threshold artifacts stay outside SQLite.
 
-## 5. Role of Team Members
+## 5. Role of Team Members and proposed handoff
 
-**The final Role of Team Members section must contain at least 500 English words.** The current source does not prove which human team member performed which task. Confirm all assignments and individual contributions with the group before writing that section.
+**The final Role of Team Members section must contain at least 500 English words.** The plan below divides upcoming explanation and report-writing work evenly. It is **not evidence that any named person wrote the existing code**: Codex/AI involvement is recorded in Section 6, and each person's actual review, changes, testing, writing, and presentation must be confirmed before the PDF describes them as completed contributions. Replace all placeholders with the registered members' names and student IDs.
 
-| Member placeholder | Task/contribution to confirm | Relevant code or document | Status | Evidence |
-| --- | --- | --- | --- | --- |
-| [组员A] | Project idea, requirements review, UI or code review — allocate actual work after discussion | Specification, `FreshTrack.App/*`, `Project_Description.md` | 待组员确认 | No verified human attribution in repository |
-| [组员A] | Lab demonstration, project registration, final ZIP/Canvas submission if assigned | Final submission materials | 待组员确认 | Group must confirm |
-| [组员B] | Domain/data code, tests, validation or documentation review — allocate actual work after discussion | `FreshTrack.Core/*`, `FreshTrack.Tests/*`, `ReadMe.md` | 待组员确认 | No verified human attribution in repository |
-| [组员B] | Final PDF writing, screenshots and reference verification if assigned | Final PDF | 待组员确认 | Group must confirm |
+### Three code explanation areas
 
-Suggested facts to collect from each person: exact files/decisions reviewed or changed, dates, test or demo work performed, difficulties solved, and contribution to report/submission. Do not claim the placeholder allocations are completed work.
+Allow approximately **3–4 minutes per person** and show one working interaction plus its implementation. `MainWindow.xaml.cs` is a shared file, so divide its explanation by feature handlers rather than claiming exclusive ownership of the whole file.
+
+| Speaker placeholder | One-third explanation scope and suggested demonstration | Primary code to explain | Planned status and verification evidence to collect |
+| --- | --- | --- | --- |
+| [你/组长] | **Inventory, shopping, and persistence:** add/search food, record a partial Used/Wasted quantity, mark a shopping item purchased, then transfer it to inventory with an expiry date. Explain how the same SQLite database updates the four views. | `FreshTrack.Core/InventoryService.cs`, `ShoppingService.cs`, `Models.cs`, `Repositories.cs`, `FreshTrackDbContext.cs`, `DemoData.cs`; corresponding inventory/shopping handlers in `FreshTrack.App/MainWindow.xaml.cs`. | Planned explanation; record the actual demonstration, code review or changes performed, and database/test evidence. |
+| [组员A] | **Expiry dashboard and machine learning:** distinguish factual Expired/Soon/Fresh date status from model-based High risk/Lower risk priority; explain 40,000 synthetic training rows, 10,000 held-out test rows, threshold calibration, and scoring a current food item. | `FreshTrack.Core/Expiry.cs`, `WasteRiskDemoService.cs`; dashboard bindings/handlers in `FreshTrack.App/MainWindow.xaml` and `.xaml.cs`; ML-related assertions in `FreshTrack.Tests/FreshTrackTests.cs`. | Planned explanation; verify the final GUI/model behavior and record the observed score, threshold and test output. |
+| [组员B] | **WPF integration, reports, and testing:** navigate the four resizable tabs, explain cross-view refresh and validation feedback, show category/month totals and waste chart, and run or present NUnit results. | `FreshTrack.App/MainWindow.xaml`, navigation/report/error-handling methods in `MainWindow.xaml.cs`, `FreshTrack.Core/ReportService.cs`, `FreshTrack.Tests/FreshTrackTests.cs`. | Planned explanation; collect screenshots, build/test output and any actual UI or test review. |
+
+These are presentation scopes, not three disjoint file ownership claims. Each speaker should explain the shared UI code only where it supports their assigned feature. The team can adjust speaking time if a live demonstration takes longer, while keeping the three substantive parts comparable.
+
+### Two report-writing areas
+
+Target about **1,800 English words of report body text**, with roughly half written by each assigned writer. Keep the final report within **1,500–2,000 words**, the Introduction at **250 words or more**, and Role of Team Members at **500 words or more**. The suggested figures below are drafting targets, not claims that the text has already been written.
+
+| Writer placeholder | Drafting responsibility | Approximate target | Material and checks |
+| --- | --- | --- | --- |
+| [组员A] | Introduction and Summary; Development Approach for WPF, inventory, shopping and EF Core/SQLite; redraw and explain the flowchart. | ~900 words total, including Introduction ≥250. | Sections 1–4 here; inspect the named source files and verify the final diagram against the code. Provide authentic screenshots and any sources used. |
+| [组员B] | Development Approach for expiry, ML.NET, reports and NUnit; Role of Team Members; Acknowledgments and AI Use; consolidate references and final formatting. | ~900 words total, including Role ≥500. | Sections 3 and 5–8 here; obtain each person's verified contribution before drafting Role, rerun tests, and state synthetic-model limitations accurately. |
+
+The three members should jointly review the merged report for factual accuracy and consistent terminology. The team leader's preparation of the final ZIP, project registration, laboratory check and Canvas upload are **future tasks until evidenced as completed**; they should not be credited as completed in the report beforehand.
+
+For the final contribution table, collect from **each of the three people**: exact files or decisions they personally reviewed or changed, when and how they tested the work, report sections or screenshots they produced, problems they resolved, and evidence such as their draft, commit, test output or lab demonstration. If a person only explained or reviewed a Codex-drafted module, say so plainly. Confirm that the registered group actually has three members and that its size complies with the assignment rules.
 
 ## 6. Acknowledgments and AI Use
 
