@@ -7,9 +7,10 @@ public sealed class ReportService(IInventoryRepository inventory)
         List<FoodItem> items = await inventory.GetAllAsync();
         var categories = items.GroupBy(x => x.Category)
             .Select(g => new CategoryReport(g.Key,
-                g.Where(x => x.State == FoodState.InStock).Sum(x => x.Quantity),
+                g.Where(x => x.State == FoodState.InStock && x.ExpiryStatus(today) != ExpiryStatus.Expired).Sum(x => x.Quantity),
                 g.Where(x => x.State == FoodState.Used).Sum(x => x.Quantity),
-                g.Where(x => x.State == FoodState.Wasted).Sum(x => x.Quantity)))
+                g.Where(x => x.State == FoodState.Wasted).Sum(x => x.Quantity),
+                g.Where(x => x.State == FoodState.InStock && x.ExpiryStatus(today) == ExpiryStatus.Expired).Sum(x => x.Quantity)))
             .OrderBy(x => x.Category).ToList();
 
         // Explicit anonymous delegate combined with a LINQ lambda: select recent
@@ -22,9 +23,10 @@ public sealed class ReportService(IInventoryRepository inventory)
         var months = items.Where(x => inLastYear(x))
             .GroupBy(x => (x.ClosedOn ?? x.PurchasedOn).ToString("yyyy-MM"))
             .Select(g => new MonthlyReport(g.Key,
-                g.Where(x => x.State == FoodState.InStock).Sum(x => x.Quantity),
+                g.Where(x => x.State == FoodState.InStock && x.ExpiryStatus(today) != ExpiryStatus.Expired).Sum(x => x.Quantity),
                 g.Where(x => x.State == FoodState.Used).Sum(x => x.Quantity),
-                g.Where(x => x.State == FoodState.Wasted).Sum(x => x.Quantity)))
+                g.Where(x => x.State == FoodState.Wasted).Sum(x => x.Quantity),
+                g.Where(x => x.State == FoodState.InStock && x.ExpiryStatus(today) == ExpiryStatus.Expired).Sum(x => x.Quantity)))
             .OrderBy(x => x.Month).ToList();
         int soon = items.Count(x => x.State == FoodState.InStock && x.ExpiryStatus(today) == ExpiryStatus.Soon);
         int expired = items.Count(x => x.State == FoodState.InStock && x.ExpiryStatus(today) == ExpiryStatus.Expired);

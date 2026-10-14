@@ -208,6 +208,42 @@ public sealed class FreshTrackTests
     }
 
     [Test]
+    public async Task Reports_SeparateAvailableAndExpiredUnitsAsTheDateChanges()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<FreshTrackDbContext>().UseSqlite(connection).Options;
+        await using var db = new FreshTrackDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+        DateTime today = new(2026, 10, 14);
+        db.Foods.AddRange(
+            new FoodItem { Name = "Cake", Category = FoodCategory.Bakery, Quantity = 1,
+                PurchasedOn = today.AddDays(-8), ExpiresOn = today.AddDays(-4) },
+            new FoodItem { Name = "Noodles", Category = FoodCategory.Produce, Quantity = 1,
+                PurchasedOn = today.AddDays(-8), ExpiresOn = today.AddDays(-4) },
+            new FoodItem { Name = "Milk", Category = FoodCategory.Produce, Quantity = 10,
+                PurchasedOn = today.AddDays(-1), ExpiresOn = today.AddDays(5) },
+            new FoodItem { Name = "Beef", Category = FoodCategory.Meat, Quantity = 1,
+                PurchasedOn = today.AddDays(-1), ExpiresOn = today.AddDays(5) });
+        await db.SaveChangesAsync();
+        var service = new ReportService(new EfInventoryRepository(db));
+        var beforeExpiry = await service.BuildAsync(today.AddDays(-5));
+        var current = await service.BuildAsync(today);
+        Assert.Multiple(() =>
+        {
+            Assert.That(beforeExpiry.Categories.Sum(x => x.InStock), Is.EqualTo(13));
+            Assert.That(beforeExpiry.Categories.Sum(x => x.ExpiredUnits), Is.Zero);
+            Assert.That(current.Categories.Sum(x => x.InStock), Is.EqualTo(11));
+            Assert.That(current.Categories.Sum(x => x.ExpiredUnits), Is.EqualTo(2));
+            Assert.That(current.Expired, Is.EqualTo(2));
+            Assert.That(current.Categories.Single(x => x.Category == FoodCategory.Produce).ExpiredUnits, Is.EqualTo(1));
+            Assert.That(current.Months.Sum(x => x.InStock), Is.EqualTo(11));
+            Assert.That(current.Months.Sum(x => x.ExpiredUnits), Is.EqualTo(2));
+            Assert.That(current.Categories.Sum(x => x.Wasted), Is.Zero);
+        });
+    }
+
+    [Test]
     public void SimulatedModel_TrainsOnSeparateDataAndGroupsCurrentStock()
     {
         var first = WasteRiskDemoService.Generate(20, WasteRiskDemoService.TrainingSeed);
@@ -233,6 +269,8 @@ public sealed class FreshTrackTests
                     PurchasedOn = today, ExpiresOn = today.AddDays(6) },
                 new() { Name = "Milk", Category = FoodCategory.Dairy, Quantity = 2,
                     PurchasedOn = today, ExpiresOn = today.AddDays(5) },
+                new() { Name = "Expired cake", Category = FoodCategory.Bakery, Quantity = 1,
+                    PurchasedOn = today.AddDays(-3), ExpiresOn = today.AddDays(-1) },
                 new() { Name = "Old bread", Category = FoodCategory.Bakery, Quantity = 1,
                     PurchasedOn = today.AddDays(-3), ExpiresOn = today, State = FoodState.Wasted }
             };
@@ -243,6 +281,7 @@ public sealed class FreshTrackTests
             var urgent = report.Items.Single(x => x.Name == "test_expire");
             var sameShelfUrgent = report.Items.Single(x => x.Name == "Meat one day left, ten-day shelf life");
             var freshMeat = report.Items.Single(x => x.Name == "Meat with ten days left");
+            var expiredCake = report.Items.Single(x => x.Name == "Expired cake");
             var newlyAdded = stock.Append(new FoodItem { Name = "New item", Category = FoodCategory.Frozen,
                 Quantity = 1, PurchasedOn = today, ExpiresOn = today.AddDays(30) }).ToList();
             var rescored = service.ScoreSavedModel(newlyAdded, folder, today);
@@ -258,6 +297,11 @@ public sealed class FreshTrackTests
                 Assert.That(report.TestRows, Is.EqualTo(10_000));
                 Assert.That(report.Categories.Sum(x => x.StockItems), Is.EqualTo(5));
                 Assert.That(report.Categories, Has.Count.EqualTo(3));
+                Assert.That(report.Categories.Any(x => x.Category == FoodCategory.Bakery), Is.False);
+                Assert.That(expiredCake.Status, Is.EqualTo(ExpiryStatus.Expired));
+                Assert.That(expiredCake.Probability, Is.Null);
+                Assert.That(expiredCake.SimulatedRisk, Is.EqualTo("—"));
+                Assert.That(expiredCake.AttentionStatus(report.Threshold), Is.EqualTo("Expired"));
                 Assert.That(report.Categories.All(x => x.AverageProbability is >= 0 and <= 1), Is.True);
                 Assert.That(report.Threshold, Is.InRange(0.50f, 0.85f));
                 Assert.That(rescored.Threshold, Is.EqualTo(report.Threshold));
@@ -275,10 +319,11 @@ public sealed class FreshTrackTests
                 Assert.That(new FoodRiskRow(101, "Near but lower risk", FoodCategory.Meat, 1,
                     today.AddDays(1), 1, ExpiryStatus.Soon, 0.1)
                     .AttentionStatus(report.Threshold), Is.EqualTo("Lower risk"));
-                Assert.That(urgent.Probability, Is.GreaterThan(freshMeat.Probability));
-                Assert.That(urgent.Probability, Is.GreaterThan(0.6));
-                Assert.That(sameShelfUrgent.Probability, Is.GreaterThan(freshMeat.Probability));
-                Assert.That(rescored.Items, Has.Count.EqualTo(6));
+                Assert.That(urgent.Probability!.Value, Is.GreaterThan(freshMeat.Probability!.Value));
+                Assert.That(urgent.Probability!.Value, Is.GreaterThan(0.6));
+                Assert.That(sameShelfUrgent.Probability!.Value, Is.GreaterThan(freshMeat.Probability!.Value));
+                Assert.That(rescored.Items, Has.Count.EqualTo(7));
+                Assert.That(rescored.Items.Single(x => x.Name == "Expired cake").Probability, Is.Null);
                 Assert.That(rescored.Items.Any(x => x.Name == "New item"), Is.True);
                 Assert.That(rescored.Categories.Single(x => x.Category == FoodCategory.Meat).StockItems, Is.EqualTo(3));
                 Assert.That(report.Categories.Sum(x => x.HighRiskItems),

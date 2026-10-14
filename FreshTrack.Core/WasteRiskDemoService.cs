@@ -104,7 +104,8 @@ public sealed class WasteRiskDemoService
         IReadOnlyList<FoodItem> foods, DateTime today, float threshold)
     {
         var stockItems = foods.Where(x => x.State == FoodState.InStock).ToList();
-        var current = stockItems
+        var eligibleItems = stockItems.Where(x => x.ExpiryStatus(today) != ExpiryStatus.Expired).ToList();
+        var current = eligibleItems
             .Select(x => new WasteTrainingRow
             {
                 Category = x.Category.ToString(),
@@ -120,16 +121,19 @@ public sealed class WasteRiskDemoService
             ? new List<WasteScoredRow>()
             : ml.Data.CreateEnumerable<WasteScoredRow>(
                 model.Transform(ml.Data.LoadFromEnumerable(current)), reuseRowObject: false).ToList();
-        if (scored.Count != stockItems.Count)
-            throw new InvalidOperationException("The model did not return a score for every in-stock food item.");
-        var items = stockItems.Zip(scored, (food, score) => new FoodRiskRow(
+        if (scored.Count != eligibleItems.Count)
+            throw new InvalidOperationException("The model did not return a score for every unexpired food item.");
+        var probabilities = eligibleItems.Zip(scored, (food, score) => (Food: food, score.Probability))
+            .ToDictionary(x => x.Food, x => (double)x.Probability);
+        var items = stockItems.Select(food => new FoodRiskRow(
                 food.Id, food.Name, food.Category, food.Quantity, food.ExpiresOn.Date,
-                (food.ExpiresOn.Date - today).Days, food.ExpiryStatus(today), score.Probability))
+                (food.ExpiresOn.Date - today).Days, food.ExpiryStatus(today),
+                probabilities.TryGetValue(food, out double probability) ? probability : null))
             .OrderBy(x => x.DaysLeft).ThenByDescending(x => x.Probability).ToList();
-        var grouped = items.GroupBy(x => x.Category)
+        var grouped = items.Where(x => x.Probability.HasValue).GroupBy(x => x.Category)
             .Select(group => new CategoryRiskRow(
-                group.Key, group.Count(), group.Average(x => x.Probability),
-                group.Count(x => x.Probability >= threshold)))
+                group.Key, group.Count(), group.Average(x => x.Probability!.Value),
+                group.Count(x => x.Probability!.Value >= threshold)))
             .OrderByDescending(x => x.AverageProbability).ToList();
         return new RiskScores(items, grouped, threshold);
     }
@@ -317,11 +321,13 @@ public sealed class WasteCalibrationRow
 }
 
 public sealed record FoodRiskRow(int FoodId, string Name, FoodCategory Category, int Quantity,
-    DateTime ExpiresOn, int DaysLeft, ExpiryStatus Status, double Probability)
+    DateTime ExpiresOn, int DaysLeft, ExpiryStatus Status, double? Probability)
 {
-    public string SimulatedRisk => (Probability * 100).ToString("F1", CultureInfo.InvariantCulture) + "%";
+    public string SimulatedRisk => Probability is double value
+        ? (value * 100).ToString("F1", CultureInfo.InvariantCulture) + "%" : "—";
     public string AttentionStatus(float threshold) => Status == ExpiryStatus.Expired
-        ? "Expired" : Probability >= threshold ? "High risk" : "Lower risk";
+        ? "Expired" : Probability is null ? "Unscored" :
+        Probability >= threshold ? "High risk" : "Lower risk";
 }
 
 public sealed record CategoryRiskRow(FoodCategory Category, int StockItems,

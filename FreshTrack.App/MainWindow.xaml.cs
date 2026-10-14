@@ -36,7 +36,7 @@ public partial class MainWindow : Window
         ShoppingCategoryBox.ItemsSource = Enum.GetValues<FoodCategory>();
         FoodCategoryBox.SelectedIndex = 0;
         ShoppingCategoryBox.SelectedIndex = 0;
-        ExpiryFilter.ItemsSource = new[] { "All", "Expired", "High risk", "Lower risk",
+        ExpiryFilter.ItemsSource = new[] { "All", "Expired", "High risk", "Low risk",
             "Date: Soon", "Date: Fresh" };
         ExpiryFilter.SelectedIndex = 0;
         PurchaseDate.SelectedDate = DateTime.Today;
@@ -69,7 +69,9 @@ public partial class MainWindow : Window
     {
         cachedFoods = await inventory.GetAllAsync();
         int availableUnits = cachedFoods.Where(x => x.State == FoodState.InStock).Sum(x => x.Quantity);
-        InventorySummary.Text = $"{cachedFoods.Count} records  •  {availableUnits} units currently in stock";
+        int expiredUnits = cachedFoods.Where(x => x.State == FoodState.InStock &&
+            x.ExpiryStatus(DateTime.Today) == ExpiryStatus.Expired).Sum(x => x.Quantity);
+        InventorySummary.Text = $"{cachedFoods.Count} records  •  {availableUnits} units in inventory, including {expiredUnits} expired";
         ShowInventory();
         var shoppingItems = await shopping.GetAllAsync();
         ShoppingGrid.ItemsSource = shoppingItems;
@@ -79,12 +81,13 @@ public partial class MainWindow : Window
         CategoryGrid.ItemsSource = result.Categories;
         MonthlyGrid.ItemsSource = result.Months;
         int stock = result.Categories.Sum(x => x.InStock);
+        int reportExpiredUnits = result.Categories.Sum(x => x.ExpiredUnits);
         int used = result.Categories.Sum(x => x.Used);
         int wasted = result.Categories.Sum(x => x.Wasted);
         StockCount.Text = stock.ToString();
         UsedCount.Text = used.ToString();
         WastedCount.Text = wasted.ToString();
-        ReportSummary.Text = $"In stock: {stock}  •  Used: {used}  •  Wasted: {wasted}  •  Expiring: {result.Soon}  •  Expired: {result.Expired}";
+        ReportSummary.Text = $"Available: {stock} units  •  Expired: {result.Expired} items / {reportExpiredUnits} units  •  Used: {used} units  •  Wasted: {wasted} units  •  Expiring: {result.Soon} items";
         int maxWaste = Math.Max(1, result.Categories.Count == 0 ? 0 : result.Categories.Max(x => x.Wasted));
         WasteBars.ItemsSource = result.Categories.Select(x => new BarRow(x.Category.ToString(), 100d * x.Wasted / maxWaste)).ToList();
         await RefreshDemoScoresIfNeededAsync();
@@ -112,24 +115,16 @@ public partial class MainWindow : Window
             RiskScores scores;
             if (!demoModelReady && !wasteDemo.HasSavedModel(DemoDirectory))
             {
-                DemoModelStatus.Text = "Preparing the synthetic model for the dashboard…";
                 DemoRiskReport trained = await Task.Run(() => wasteDemo.TrainAndPredict(snapshot, DemoDirectory, today));
                 scores = new RiskScores(trained.Items, trained.Categories, trained.Threshold);
-                DemoModelStatus.Text =
-                    $"Simulation only • {trained.TrainingRows:N0} train / {trained.TestRows:N0} test" +
-                    $" • AUC {trained.Auc:F3} • F1 {trained.F1:F3}" +
-                    $" • precision {trained.Precision:F3} • recall {trained.Recall:F3}";
             }
             else
             {
                 scores = await Task.Run(() => wasteDemo.ScoreSavedModel(snapshot, DemoDirectory, today));
-                if (!demoModelReady)
-                    DemoModelStatus.Text = "Saved synthetic model loaded. Train again to refresh test metrics.";
             }
             BindRiskScores(scores);
             lastScoredStockSignature = signature;
             demoModelReady = true;
-            DemoStockStatus.Text = $"Scores refreshed for {scores.Items.Count} current stock records on {today:d}. High risk ≥ {scores.Threshold:P0}.";
         }
         finally
         {
@@ -140,8 +135,6 @@ public partial class MainWindow : Window
     private void BindRiskScores(RiskScores scores)
     {
         currentRiskScores = scores;
-        DemoItemGrid.ItemsSource = scores.Items;
-        DemoRiskGrid.ItemsSource = scores.Categories;
     }
 
     private void ShowInventory()
@@ -160,11 +153,12 @@ public partial class MainWindow : Window
         {
             ExpiryStatus dateStatus = x.ExpiryStatus(today);
             riskById.TryGetValue(x.Id, out FoodRiskRow? risk);
-            string priority = risk is null ? "Unscored" :
+            string priority = dateStatus == ExpiryStatus.Expired ? "Expired" : risk is null ? "Not rated" :
                 risk.AttentionStatus(currentRiskScores!.Threshold);
+            if (priority == "Lower risk") priority = "Low risk";
             return new ExpiryRow(x.Name, x.Category, x.Quantity, x.ExpiresOn,
                 priority, dateStatus, (x.ExpiresOn.Date - today).Days,
-                risk?.SimulatedRisk ?? "—");
+                dateStatus == ExpiryStatus.Expired ? "—" : risk?.SimulatedRisk ?? "—");
         }).ToList();
         string filter = ExpiryFilter.SelectedItem?.ToString() ?? "All";
         ExpiryGrid.ItemsSource = rows.Where(x => filter == "All" || x.Status == filter ||
@@ -174,13 +168,10 @@ public partial class MainWindow : Window
             .ThenBy(x => x.DaysLeft).ToList();
         int expired = rows.Count(x => x.Status == "Expired");
         int highRisk = rows.Count(x => x.Status == "High risk");
-        int lowerRisk = rows.Count(x => x.Status == "Lower risk");
+        int lowerRisk = rows.Count(x => x.Status == "Low risk");
         ExpiredCount.Text = expired.ToString();
         HighRiskCount.Text = highRisk.ToString();
         LowerRiskCount.Text = lowerRisk.ToString();
-        string threshold = currentRiskScores is null ? "model unavailable" :
-            $"high risk ≥ {currentRiskScores.Threshold:P0}";
-        ExpirySummary.Text = $"{rows.Count} in-stock records  •  {expired} expired  •  {highRisk} high risk  •  {lowerRisk} lower risk  •  {threshold}";
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -333,12 +324,7 @@ public partial class MainWindow : Window
         TrainDemoButton.IsEnabled = false;
         await demoModelGate.WaitAsync();
         demoTrainingInProgress = true;
-        demoModelReady = false;
-        currentRiskScores = null;
-        DemoItemGrid.ItemsSource = null;
-        DemoRiskGrid.ItemsSource = null;
-        DemoModelStatus.Text = "Generating separate synthetic data files and training the model…";
-        DemoStockStatus.Text = "Training and scoring current stock…";
+        FeedbackText.Text = "Updating risk estimates…";
         var stockSnapshot = cachedFoods.ToList();
         DateTime today = DateTime.Today;
         bool success = false;
@@ -350,17 +336,7 @@ public partial class MainWindow : Window
                 BindRiskScores(new RiskScores(result.Items, result.Categories, result.Threshold));
                 lastScoredStockSignature = StockSignature(stockSnapshot, today);
                 demoModelReady = true;
-                DemoModelStatus.Text =
-                    $"Simulation only • {result.TrainingRows:N0} train / {result.TestRows:N0} test" +
-                    $" • AUC {result.Auc:F3} • F1 {result.F1:F3}" +
-                    $" • precision {result.Precision:F3} • recall {result.Recall:F3}";
-                DemoStockStatus.Text = $"Scores shown for {result.Items.Count} current stock records on {today:d}. High risk ≥ {result.Threshold:P0}.";
-            }, "Demo model trained from synthetic records.");
-            if (!success)
-            {
-                DemoModelStatus.Text = "Demo model unavailable; see the error message below.";
-                DemoStockStatus.Text = "No current scores available.";
-            }
+            }, "Risk estimates updated.");
         }
         finally
         {
@@ -370,7 +346,7 @@ public partial class MainWindow : Window
         }
         if (success)
         {
-            await RunAsync(RefreshDemoScoresIfNeededAsync, "Demo model trained from synthetic records.");
+            await RunAsync(RefreshDemoScoresIfNeededAsync, "Risk estimates updated.");
             ShowExpiry();
         }
     }

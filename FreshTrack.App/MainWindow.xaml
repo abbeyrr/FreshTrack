@@ -260,19 +260,21 @@
             <TabItem Header="Expiry dashboard">
                 <Grid Margin="0,16,0,0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                     <Grid Margin="0,0,0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                        <StackPanel><TextBlock Text="WHAT NEEDS ATTENTION" Style="{StaticResource Eyebrow}"/><TextBlock Text="Expiry &amp; risk dashboard" Style="{StaticResource PageTitle}"/>
-                            <TextBlock Text="Expired uses dates; high risk uses the calibrated synthetic model. Date status stays visible below." Style="{StaticResource Hint}" Margin="0,3,0,0"/></StackPanel>
+                        <StackPanel><TextBlock Text="WHAT NEEDS ATTENTION" Style="{StaticResource Eyebrow}"/><TextBlock Text="Expiry dashboard" Style="{StaticResource PageTitle}"/>
+                            <TextBlock Text="See which foods to use first." Style="{StaticResource Hint}" Margin="0,3,0,0"/></StackPanel>
                         <StackPanel Grid.Column="1" VerticalAlignment="Bottom"><TextBlock Text="SHOW STATUS" Style="{StaticResource FieldLabel}" Margin="0,0,0,5"/><ComboBox x:Name="ExpiryFilter" Width="180" SelectionChanged="ExpiryFilter_SelectionChanged"/></StackPanel>
                     </Grid>
                     <Grid Grid.Row="1" Margin="0,0,0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <Border Style="{StaticResource Card}" Background="#FFF2EF" BorderBrush="#F5D6CF"><StackPanel><TextBlock Text="EXPIRED" Style="{StaticResource Eyebrow}" Foreground="#B85444"/><TextBlock x:Name="ExpiredCount" Text="0" Style="{StaticResource MetricValue}" Foreground="#B85444"/><TextBlock Text="Past the expiry date" Style="{StaticResource Hint}"/></StackPanel></Border>
-                        <Border Grid.Column="2" Style="{StaticResource Card}" Background="#FFF8E9" BorderBrush="#F1E5BD"><StackPanel><TextBlock Text="HIGH WASTE RISK" Style="{StaticResource Eyebrow}" Foreground="#A87813"/><TextBlock x:Name="HighRiskCount" Text="0" Style="{StaticResource MetricValue}" Foreground="#A87813"/><TextBlock Text="At or above the model threshold" Style="{StaticResource Hint}"/></StackPanel></Border>
-                        <Border Grid.Column="4" Style="{StaticResource Card}" Background="#EAF6EE" BorderBrush="#CCEAD5"><StackPanel><TextBlock Text="LOWER MODEL RISK" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="LowerRiskCount" Text="0" Style="{StaticResource MetricValue}"/><TextBlock Text="Below the model threshold" Style="{StaticResource Hint}"/></StackPanel></Border>
+                        <Border Grid.Column="2" Style="{StaticResource Card}" Background="#FFF8E9" BorderBrush="#F1E5BD"><StackPanel><TextBlock Text="HIGH WASTE RISK" Style="{StaticResource Eyebrow}" Foreground="#A87813"/><TextBlock x:Name="HighRiskCount" Text="0" Style="{StaticResource MetricValue}" Foreground="#A87813"/><TextBlock Text="Use these first" Style="{StaticResource Hint}"/></StackPanel></Border>
+                        <Border Grid.Column="4" Style="{StaticResource Card}" Background="#EAF6EE" BorderBrush="#CCEAD5"><StackPanel><TextBlock Text="LOW WASTE RISK" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="LowerRiskCount" Text="0" Style="{StaticResource MetricValue}"/><TextBlock Text="Less urgent" Style="{StaticResource Hint}"/></StackPanel></Border>
                     </Grid>
                     <Border Grid.Row="2" Style="{StaticResource Card}">
                         <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                            <DockPanel Margin="0,0,0,12"><TextBlock Text="Food attention timeline" Style="{StaticResource SectionTitle}"/>
-                                <TextBlock x:Name="ExpirySummary" Style="{StaticResource Hint}" Margin="16,4,0,0"/></DockPanel>
+                            <Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <TextBlock Text="Current stock" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
+                                <Button x:Name="TrainDemoButton" Grid.Column="1" Content="Update risk estimates" Click="TrainDemoModel_Click"/>
+                            </Grid>
                             <DataGrid x:Name="ExpiryGrid" Grid.Row="1">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Priority" Binding="{Binding Status}" Width="*" MinWidth="110"/>
@@ -282,7 +284,7 @@
                                     <DataGridTextColumn Header="Expiry" Binding="{Binding ExpiresOn, StringFormat=d}" Width="*" MinWidth="110"/>
                                     <DataGridTextColumn Header="Days left" Binding="{Binding DaysLeft}" Width="*" MinWidth="100"/>
                                     <DataGridTextColumn Header="Date status" Binding="{Binding DateStatus}" Width="*" MinWidth="110"/>
-                                    <DataGridTextColumn Header="Simulated waste risk" Binding="{Binding SimulatedRisk}" Width="*" MinWidth="145"/>
+                                    <DataGridTextColumn Header="Waste risk" Binding="{Binding SimulatedRisk}" Width="*" MinWidth="110"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </Grid>
@@ -347,14 +349,15 @@
 
             <TabItem Header="Reports">
                 <ScrollViewer Margin="0,16,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <Grid Margin="0,0,0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <StackPanel><TextBlock Text="SEE THE BIG PICTURE" Style="{StaticResource Eyebrow}"/><TextBlock Text="Reports &amp; insights" Style="{StaticResource PageTitle}"/>
-                            <TextBlock x:Name="ReportSummary" Text="Loading reports…" Style="{StaticResource Hint}" Margin="0,3,0,0"/></StackPanel>
+                            <TextBlock x:Name="ReportSummary" Text="Loading reports…" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,3,12,0"/>
+                        </StackPanel>
                         <Button Grid.Column="1" Content="Refresh reports" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" Click="Refresh_Click"/>
                     </Grid>
                     <Grid Grid.Row="1" Margin="0,0,0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="IN STOCK" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="StockCount" Text="0" Style="{StaticResource MetricValue}"/><TextBlock Text="Units available now" Style="{StaticResource Hint}"/></StackPanel></Border>
+                        <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="AVAILABLE" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="StockCount" Text="0" Style="{StaticResource MetricValue}"/><TextBlock Text="Unexpired units in inventory" Style="{StaticResource Hint}"/></StackPanel></Border>
                         <Border Grid.Column="2" Style="{StaticResource Card}"><StackPanel><TextBlock Text="USED" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="UsedCount" Text="0" Style="{StaticResource MetricValue}"/><TextBlock Text="Units recorded as used" Style="{StaticResource Hint}"/></StackPanel></Border>
                         <Border Grid.Column="4" Style="{StaticResource Card}"><StackPanel><TextBlock Text="WASTED" Style="{StaticResource Eyebrow}" Foreground="#B85444"/><TextBlock x:Name="WastedCount" Text="0" Style="{StaticResource MetricValue}" Foreground="#B85444"/><TextBlock Text="Units recorded as wasted" Style="{StaticResource Hint}"/></StackPanel></Border>
                     </Grid>
@@ -363,7 +366,8 @@
                             <TextBlock Text="By food category" Style="{StaticResource SectionTitle}" Margin="0,0,0,12"/>
                             <DataGrid x:Name="CategoryGrid" Grid.Row="1"><DataGrid.Columns>
                                 <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="2*"/>
-                                <DataGridTextColumn Header="In stock" Binding="{Binding InStock}" Width="*"/>
+                                <DataGridTextColumn Header="Available units" Binding="{Binding InStock}" Width="*"/>
+                                <DataGridTextColumn Header="Expired units" Binding="{Binding ExpiredUnits}" Width="*"/>
                                 <DataGridTextColumn Header="Used" Binding="{Binding Used}" Width="*"/>
                                 <DataGridTextColumn Header="Wasted" Binding="{Binding Wasted}" Width="*"/>
                             </DataGrid.Columns></DataGrid>
@@ -373,7 +377,8 @@
                                 <TextBlock Text="Monthly activity" Style="{StaticResource SectionTitle}" Margin="0,0,0,12"/>
                                 <DataGrid x:Name="MonthlyGrid" Grid.Row="1"><DataGrid.Columns>
                                     <DataGridTextColumn Header="Month" Binding="{Binding Month}" Width="*"/>
-                                    <DataGridTextColumn Header="In stock" Binding="{Binding InStock}" Width="*"/>
+                                    <DataGridTextColumn Header="Available" Binding="{Binding InStock}" Width="*"/>
+                                    <DataGridTextColumn Header="Expired" Binding="{Binding ExpiredUnits}" Width="*"/>
                                     <DataGridTextColumn Header="Used" Binding="{Binding Used}" Width="*"/>
                                     <DataGridTextColumn Header="Wasted" Binding="{Binding Wasted}" Width="*"/>
                                 </DataGrid.Columns></DataGrid>
@@ -387,42 +392,6 @@
                             </Grid></Border>
                         </Grid>
                     </Grid>
-                    <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,14,0,0">
-                        <StackPanel>
-                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="Simulated waste-risk model" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
-                                <Button x:Name="TrainDemoButton" Grid.Column="1" Content="Train demo model" Click="TrainDemoModel_Click"/>
-                            </Grid>
-                            <TextBlock Text="Demonstration only: predictions learn from generated data, not real household outcomes. The threshold is calibrated on training data."
-                                       Style="{StaticResource Hint}" Margin="0,7,0,0"/>
-                            <TextBlock x:Name="DemoModelStatus" Text="Not trained. Generate 40,000 training and 10,000 independent test records."
-                                       Style="{StaticResource Hint}" Margin="0,5,0,2"/>
-                            <TextBlock x:Name="DemoStockStatus" Text="Train the model to score current stock."
-                                       Style="{StaticResource Hint}" Margin="0,0,0,10"/>
-                            <TextBlock Text="Current stock: expiry status and individual simulated score" Style="{StaticResource SectionTitle}" Margin="0,2,0,4"/>
-                            <TextBlock Text="Expiry status comes from dates; the score estimates simulated waste, not the chance of expiry."
-                                       Style="{StaticResource Hint}" Margin="0,0,0,8"/>
-                            <DataGrid x:Name="DemoItemGrid" MinHeight="110" MaxHeight="300" Margin="0,0,0,14">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Food" Binding="{Binding Name}" Width="2*"/>
-                                    <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="*"/>
-                                    <DataGridTextColumn Header="Expires" Binding="{Binding ExpiresOn, StringFormat=d}" Width="*"/>
-                                    <DataGridTextColumn Header="Days left" Binding="{Binding DaysLeft}" Width="*"/>
-                                    <DataGridTextColumn Header="Expiry status" Binding="{Binding Status}" Width="*"/>
-                                    <DataGridTextColumn Header="Simulated waste score" Binding="{Binding SimulatedRisk}" Width="2*"/>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                            <TextBlock Text="Category summary" Style="{StaticResource SectionTitle}" Margin="0,0,0,8"/>
-                            <DataGrid x:Name="DemoRiskGrid" MinHeight="110" MaxHeight="270">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="2*"/>
-                                    <DataGridTextColumn Header="In-stock items" Binding="{Binding StockItems}" Width="*"/>
-                                    <DataGridTextColumn Header="Average simulated risk" Binding="{Binding AverageRisk}" Width="2*"/>
-                                    <DataGridTextColumn Header="Scores above threshold" Binding="{Binding HighRiskItems}" Width="*"/>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </StackPanel>
-                    </Border>
                 </Grid>
                 </ScrollViewer>
             </TabItem>

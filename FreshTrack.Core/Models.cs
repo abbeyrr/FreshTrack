@@ -28,5 +28,5 @@ public sealed class ShoppingItem
     public bool AddedToInventory { get; set; }
 }
 
-public sealed record CategoryReport(FoodCategory Category, int InStock, int Used, int Wasted);
-public sealed record MonthlyReport(string Month, int InStock, int Used, int Wasted);
+public sealed record CategoryReport(FoodCategory Category, int InStock, int Used, int Wasted, int ExpiredUnits);
+public sealed record MonthlyReport(string Month, int InStock, int Used, int Wasted, int ExpiredUnits);
